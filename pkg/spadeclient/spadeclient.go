@@ -8,13 +8,14 @@ import (
 	"filecoin-spade-client/pkg/log"
 	"filecoin-spade-client/pkg/lotusclient"
 	"fmt"
-	fildatasegment "github.com/ribasushi/fil-datasegment/pkg/dlass"
-	"golang.org/x/xerrors"
 	"io"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	fildatasegment "github.com/storacha/fil-datasegment/pkg/dlass"
+	"golang.org/x/xerrors"
 )
 
 type SpadeClient struct {
@@ -22,7 +23,7 @@ type SpadeClient struct {
 	LotusClient   *lotusclient.LotusClient
 	HttpTransport http.RoundTripper
 
-	LatestEligiblePiecesRequest       EligiblePiecesResponseEnvelope
+	LatestEligiblePiecesRequest       PiecesEligibleResponseEnvelope
 	LatestEligiblePiecesRequestMoment time.Time
 
 	requestedPieces      []string
@@ -133,21 +134,21 @@ func (sc *SpadeClient) RequestNewDeal(ctx context.Context) (string, error) {
 	return "", xerrors.New(" > no eligible pieces are valid to be requested")
 }
 
-func (sc *SpadeClient) invoke(ctx context.Context, pid string, policycid string) (*ResponseInvoke, error) {
+func (sc *SpadeClient) invoke(ctx context.Context, pid string, policycid string) (*ResponseDealRequest, error) {
 	data, err := sc.doRequest(
 		ctx,
 		"POST",
 		"/sp/invoke",
 		fmt.Sprintf("call=reserve_piece&piece_cid=%s&tenant_policy=%s", pid, policycid),
 	)
-	//if err != nil {
-	//	return nil, xerrors.Errorf("error invoking reservation request: %+v", err)
-	//}
+	if err != nil {
+		return nil, xerrors.Errorf("error invoking reservation request: %+v", err)
+	}
 
 	//log.Infof("Invoke response:\n %s", string(data))
 
 	//@todo map this data?
-	var resp ResponseInvokeEnvelope
+	var resp DealRequestResponseEnvelope
 	err = json.Unmarshal(data, &resp)
 	if err != nil {
 		return nil, xerrors.Errorf("could not unmarshall response: %+v", err)
@@ -172,7 +173,7 @@ func (sc *SpadeClient) RequestPieceManifest(ctx context.Context, proposalId stri
 		return nil, xerrors.Errorf("error requesting piece manifest: %+v", err)
 	}
 
-	var resp ResponsePieceManifestEnvelope
+	var resp PieceManifestResponseEnvelope
 	err = json.Unmarshal(data, &resp)
 	if err != nil {
 		return nil, xerrors.Errorf("could not unmarshall response: %+v", err)
